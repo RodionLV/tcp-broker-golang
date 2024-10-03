@@ -1,3 +1,3 @@
-module tcp_broker
+module tcp-broker-golang
 
 go 1.23.1
