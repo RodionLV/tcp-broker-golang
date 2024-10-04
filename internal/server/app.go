@@ -1,10 +1,10 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
-	"io"
 	"net"
-	"os"
+	"tcp-broker-golang/pkg/tcp/transfer"
 )
 
 func Run() {
@@ -25,13 +25,49 @@ func Run() {
 
 		fmt.Println("client is connected", client)
 
-		go func(client net.Conn) {
-			defer client.Close()
-
-			for {
-				io.Copy(os.Stdout, client)
-				fmt.Println("get message")
-			}
-		}(client)
+		go handleConnection(client)
 	}
+}
+
+func handleConnection(client net.Conn) {
+	defer client.Close()
+
+	var typeClient string
+
+	for {
+		if len(typeClient) == 0 {
+			msg, err := bufio.NewReader(client).ReadString('\n')
+			if err != nil {
+				return
+			}
+
+			if len(msg) <= 1 {
+				continue
+			}
+
+			switch msg[:len(msg)-1] {
+			case "send":
+				typeClient = "sendler"
+			case "receive":
+				typeClient = "receiver"
+			default:
+				fmt.Println("message '", msg[:len(msg)-1], "' is wrong")
+			}
+		} else {
+			data, err := transfer.ReadMessage(client)
+			if err != nil {
+				continue
+			}
+
+			fmt.Println("message:", string(data), "from:", typeClient)
+		}
+	}
+}
+
+func Put() {
+
+}
+
+func Get() {
+
 }
