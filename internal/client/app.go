@@ -3,7 +3,6 @@ package client
 import (
 	"fmt"
 	"net"
-	"tcp-broker-golang/pkg/tcp/transfer"
 )
 
 func Run() {
@@ -17,13 +16,12 @@ func Run() {
 	defer client.Close()
 
 	typeClient := selectingTypeClient()
-
 	_, err = client.Write([]byte(typeClient + "\n"))
-
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+	fmt.Println(typeClient)
 
 	switch typeClient {
 	case "send":
@@ -40,7 +38,6 @@ func selectingTypeClient() string {
 	for {
 		fmt.Print("> ")
 		_, err := fmt.Scan(&typeClient)
-
 		if err != nil {
 			fmt.Println(err)
 			continue
@@ -50,24 +47,4 @@ func selectingTypeClient() string {
 			return typeClient
 		}
 	}
-}
-
-func handleSending(client net.Conn) {
-	fmt.Println("sendler:")
-
-	var message string
-
-	for {
-		fmt.Print("> ")
-		_, err := fmt.Scan(&message)
-		if err != nil {
-			continue
-		}
-
-		transfer.WriteMessage(client, message)
-	}
-}
-
-func handleReceiving(client net.Conn) {
-	fmt.Println("receiver:")
 }

@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"tcp-broker-golang/pkg/tcp/transfer"
 )
 
 func Run() {
@@ -16,6 +15,8 @@ func Run() {
 	}
 	defer listener.Close()
 
+	var queueCh = make(chan []byte)
+
 	for {
 		client, err := listener.Accept()
 		if err != nil {
@@ -25,49 +26,28 @@ func Run() {
 
 		fmt.Println("client is connected", client)
 
-		go handleConnection(client)
+		go handleConnection(client, queueCh)
 	}
 }
 
-func handleConnection(client net.Conn) {
-	defer client.Close()
-
-	var typeClient string
-
+func initTypeClient(client net.Conn) (string, error) {
 	for {
-		if len(typeClient) == 0 {
-			msg, err := bufio.NewReader(client).ReadString('\n')
-			if err != nil {
-				return
-			}
+		msg, err := bufio.NewReader(client).ReadString('\n')
+		if err != nil {
+			return "", err
+		}
 
-			if len(msg) <= 1 {
-				continue
-			}
+		if len(msg) <= 1 {
+			continue
+		}
 
-			switch msg[:len(msg)-1] {
-			case "send":
-				typeClient = "sendler"
-			case "receive":
-				typeClient = "receiver"
-			default:
-				fmt.Println("message '", msg[:len(msg)-1], "' is wrong")
-			}
-		} else {
-			data, err := transfer.ReadMessage(client)
-			if err != nil {
-				continue
-			}
-
-			fmt.Println("message:", string(data), "from:", typeClient)
+		switch msg[:len(msg)-1] {
+		case "send":
+			return "sendler", nil
+		case "receive":
+			return "receiver", nil
+		default:
+			fmt.Println("message '", msg[:len(msg)-1], "' is wrong")
 		}
 	}
-}
-
-func Put() {
-
-}
-
-func Get() {
-
 }
