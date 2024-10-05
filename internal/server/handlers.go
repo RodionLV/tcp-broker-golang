@@ -1,53 +1,96 @@
 package server
 
 import (
+	"bufio"
 	"fmt"
 	"net"
+	"strings"
 	"tcp-broker-golang/pkg/tcp/transfer"
 )
 
-func handleConnection(client net.Conn, queueCh chan []byte) {
+const DELIM = ":"
+
+func handleConnection(client net.Conn, queueMap map[string]chan []byte) {
 	defer client.Close()
 
-	typeClient, err := initTypeClient(client)
+	typeClient, topic, err := initTypeClient(client)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
+	_, isExists := queueMap[topic]
+	if !isExists {
+		fmt.Println("creating queue named:", topic)
+		queueMap[topic] = make(chan []byte)
+	}
+
+	fmt.Println("setup\n client type:", typeClient, "\n queue:", topic)
+
+	clientSetup := ClientSetup{
+		Client:     client,
+		QueueCh:    queueMap[topic],
+		ClientType: typeClient,
+	}
+
 	switch typeClient {
 	case "sendler":
-		handleSendler(client, queueCh)
+		handleSendler(clientSetup)
 	case "receiver":
-		handleReceiver(client, queueCh)
+		handleReceiver(clientSetup)
 	}
 }
 
-func handleReceiver(client net.Conn, queueCh chan []byte) {
+func handleReceiver(clientSetup ClientSetup) {
 	for {
-		data := Get(queueCh)
+		data := clientSetup.Get()
+		_, err := transfer.WriteMessage(clientSetup.Client, string(data))
 
-		transfer.WriteMessage(client, string(data))
-	}
-}
-
-func handleSendler(client net.Conn, queueCh chan []byte) {
-	for {
-		data, err := transfer.ReadMessage(client)
 		if err != nil {
-			continue
+			fmt.Println(err)
+			go clientSetup.Put(data)
+			break
+		}
+	}
+}
+
+func handleSendler(clientSetup ClientSetup) {
+	for {
+		data, err := transfer.ReadMessage(clientSetup.Client)
+		if err != nil {
+			fmt.Println(err)
+			return
 		}
 
-		go Put(queueCh, data)
-
+		go clientSetup.Put(data)
 		fmt.Println("put message:", string(data))
 	}
 }
 
-func Put(queueCh chan []byte, data []byte) {
-	queueCh <- data
-}
+func initTypeClient(client net.Conn) (string, string, error) {
+	for {
+		msg, err := bufio.NewReader(client).ReadString('\n')
+		if err != nil {
+			fmt.Println(err)
+			return "", "", err
+		}
 
-func Get(queueCh chan []byte) []byte {
-	return <-queueCh
+		if len(msg) <= 3 {
+			continue
+		}
+
+		values := strings.Split(msg[:len(msg)-1], DELIM)
+		if len(values) != 2 {
+			continue
+		}
+
+		switch values[0] {
+		case "send":
+			return "sendler", values[1], nil
+		case "receive":
+			return "receiver", values[1], nil
+		default:
+			fmt.Println("message '", strings.Join(values, DELIM), "' is wrong")
+		}
+	}
 }

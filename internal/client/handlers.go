@@ -16,7 +16,11 @@ func handleSending(client net.Conn) {
 			continue
 		}
 
-		transfer.WriteMessage(client, message)
+		_, err = transfer.WriteMessage(client, message)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 }
 
@@ -24,7 +28,8 @@ func handleReceiving(client net.Conn) {
 	for {
 		data, err := transfer.ReadMessage(client)
 		if err != nil {
-			continue
+			fmt.Println(err)
+			return
 		}
 
 		fmt.Println("receive:", string(data))
